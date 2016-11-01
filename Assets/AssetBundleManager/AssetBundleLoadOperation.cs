@@ -4,8 +4,14 @@ using UnityEngine.SceneManagement;
 
 namespace AssetBundles
 {
+    /// <summary>
+    /// <para>AssetBundle加载操作</para>
+    /// <para>加载资源(Asset)的时候，等候AssetBundle的加载成功，再去AssetBundle里加载</para>
+    /// </summary>
     public abstract class AssetBundleLoadOperation : IEnumerator
     {
+        #region 系统
+        
         public object Current
         {
             get
@@ -13,6 +19,7 @@ namespace AssetBundles
                 return null;
             }
         }
+
         public bool MoveNext()
         {
             return !IsDone();
@@ -21,7 +28,13 @@ namespace AssetBundles
         public void Reset()
         {
         }
+        
+        #endregion 系统
 
+        /// <summary>
+        /// 是否需要更新，不需要则是好了
+        /// </summary>
+        /// <returns></returns>
         abstract public bool Update();
 
         abstract public bool IsDone();
@@ -63,6 +76,7 @@ namespace AssetBundles
     }
 
 #endif
+
     public class AssetBundleLoadLevelOperation : AssetBundleLoadOperation
     {
         protected string m_AssetBundleName;
@@ -119,6 +133,9 @@ namespace AssetBundles
         public abstract T GetAsset<T>() where T : UnityEngine.Object;
     }
 
+    /// <summary>
+    /// 模拟的
+    /// </summary>
     public class AssetBundleLoadAssetOperationSimulation : AssetBundleLoadAssetOperation
     {
         Object m_SimulatedObject;
@@ -162,16 +179,25 @@ namespace AssetBundles
         public override T GetAsset<T>()
         {
             if (m_Request != null && m_Request.isDone)
+            {
                 return m_Request.asset as T;
+            }
             else
+            {
                 return null;
+            }
         }
 
-        // Returns true if more Update calls are required.
+        /// <summary>
+        /// Returns true if more Update calls are required.
+        /// </summary>
+        /// <returns></returns>
         public override bool Update()
         {
             if (m_Request != null)
+            {
                 return false;
+            }
 
             LoadedAssetBundle bundle = AssetBundleManager.GetLoadedAssetBundle(m_AssetBundleName, out m_DownloadingError);
             if (bundle != null)
@@ -217,9 +243,9 @@ namespace AssetBundles
                 return false;
             }
             else
+            {
                 return true;
+            }
         }
     }
-
-
 }
