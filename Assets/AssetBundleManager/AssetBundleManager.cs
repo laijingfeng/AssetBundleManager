@@ -2,7 +2,6 @@
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
-using System.Collections;
 using System.Collections.Generic;
 
 /*
@@ -31,7 +30,7 @@ namespace AssetBundles
         /// Bundle
         /// </summary>
         public AssetBundle m_AssetBundle;
-        
+
         /// <summary>
         /// 引用计数
         /// </summary>
@@ -52,14 +51,17 @@ namespace AssetBundles
         public enum LogMode { All, JustErrors };
         public enum LogType { Info, Warning, Error };
 
+        #region 变量
+
         static LogMode m_LogMode = LogMode.All;
         static string m_BaseDownloadingURL = "";
         static string[] m_ActiveVariants = { };
-        
+
         /// <summary>
         /// 根Manifest
         /// </summary>
         static AssetBundleManifest m_AssetBundleManifest = null;
+
 #if UNITY_EDITOR
         static int m_SimulateAssetBundleInEditor = -1;
         const string kSimulateAssetBundles = "SimulateAssetBundles";
@@ -138,7 +140,7 @@ namespace AssetBundles
                 {
                     m_SimulateAssetBundleInEditor = EditorPrefs.GetBool(kSimulateAssetBundles, true) ? 1 : 0;
                 }
-                
+
                 return m_SimulateAssetBundleInEditor != 0;
             }
             set
@@ -153,27 +155,9 @@ namespace AssetBundles
         }
 
 #endif
+        #endregion 变量
 
-        private static string GetStreamingAssetsPath()
-        {
-            if (Application.isEditor)
-            {
-                //Use the build output folder directly.
-                return "file://" + System.Environment.CurrentDirectory.Replace("\\", "/");
-            }
-            else if (Application.isWebPlayer)
-            {
-                return System.IO.Path.GetDirectoryName(Application.absoluteURL).Replace("\\", "/") + "/StreamingAssets";
-            }
-            else if (Application.isMobilePlatform || Application.isConsolePlatform)
-            {
-                return Application.streamingAssetsPath;
-            }
-            else //For standalone player.
-            {
-                return "file://" + Application.streamingAssetsPath;
-            }
-        }
+        #region 设置
 
         public static void SetSourceAssetBundleDirectory(string relativePath)
         {
@@ -210,53 +194,9 @@ namespace AssetBundles
             }
         }
 
-        /// <summary>
-        /// <para>获得加载好的AssetBundle</para>
-        /// <para>Get loaded AssetBundle, only return vaild object when all the dependencies are downloaded successfully.</para>
-        /// </summary>
-        /// <param name="assetBundleName"></param>
-        /// <param name="error"></param>
-        /// <returns></returns>
-        static public LoadedAssetBundle GetLoadedAssetBundle(string assetBundleName, out string error)
-        {
-            if (m_DownloadingErrors.TryGetValue(assetBundleName, out error))
-            {
-                return null;
-            }
+        #endregion 设置
 
-            LoadedAssetBundle bundle = null;
-            m_LoadedAssetBundles.TryGetValue(assetBundleName, out bundle);
-            if (bundle == null)
-            {
-                return null;
-            }
-
-            // No dependencies are recorded, only the bundle itself is required.
-            string[] dependencies = null;
-            if (!m_Dependencies.TryGetValue(assetBundleName, out dependencies))
-            {
-                return bundle;
-            }
-
-            // Make sure all dependencies are loaded
-            foreach (var dependency in dependencies)
-            {
-                if (m_DownloadingErrors.TryGetValue(assetBundleName, out error))
-                {
-                    return bundle;
-                }
-
-                // Wait all the dependent assetBundles being loaded.
-                LoadedAssetBundle dependentBundle;
-                m_LoadedAssetBundles.TryGetValue(dependency, out dependentBundle);
-                if (dependentBundle == null)
-                {
-                    return null;
-                }
-            }
-
-            return bundle;
-        }
+        #region 初始化
 
         static public AssetBundleLoadManifestOperation Initialize()
         {
@@ -292,6 +232,10 @@ namespace AssetBundles
             return operation;
         }
 
+        #endregion 初始化
+
+        #region 加载AssetBundle
+
         /// <summary>
         /// Load AssetBundle and its dependencies.
         /// </summary>
@@ -325,50 +269,6 @@ namespace AssetBundles
             if (!isAlreadyProcessed && !isLoadingAssetBundleManifest)
             {
                 LoadDependencies(assetBundleName);
-            }
-        }
-
-        // Remaps the asset bundle name to the best fitting asset bundle variant.
-        static protected string RemapVariantName(string assetBundleName)
-        {
-            string[] bundlesWithVariant = m_AssetBundleManifest.GetAllAssetBundlesWithVariant();
-
-            string[] split = assetBundleName.Split('.');
-
-            int bestFit = int.MaxValue;
-            int bestFitIndex = -1;
-            // Loop all the assetBundles with variant to find the best fit variant assetBundle.
-            for (int i = 0; i < bundlesWithVariant.Length; i++)
-            {
-                string[] curSplit = bundlesWithVariant[i].Split('.');
-                if (curSplit[0] != split[0])
-                    continue;
-
-                int found = System.Array.IndexOf(m_ActiveVariants, curSplit[1]);
-
-                // If there is no active variant found. We still want to use the first 
-                if (found == -1)
-                    found = int.MaxValue - 1;
-
-                if (found < bestFit)
-                {
-                    bestFit = found;
-                    bestFitIndex = i;
-                }
-            }
-
-            if (bestFit == int.MaxValue - 1)
-            {
-                Debug.LogWarning("Ambigious asset bundle variant chosen because there was no matching active variant: " + bundlesWithVariant[bestFitIndex]);
-            }
-
-            if (bestFitIndex != -1)
-            {
-                return bundlesWithVariant[bestFitIndex];
-            }
-            else
-            {
-                return assetBundleName;
             }
         }
 
@@ -445,54 +345,6 @@ namespace AssetBundles
             for (int i = 0; i < dependencies.Length; i++)
             {
                 LoadAssetBundleInternal(dependencies[i], false);
-            }
-        }
-
-        // Unload assetbundle and its dependencies.
-        static public void UnloadAssetBundle(string assetBundleName)
-        {
-#if UNITY_EDITOR
-            // If we're in Editor simulation mode, we don't have to load the manifest assetBundle.
-            if (SimulateAssetBundleInEditor)
-                return;
-#endif
-
-            //Debug.Log(m_LoadedAssetBundles.Count + " assetbundle(s) in memory before unloading " + assetBundleName);
-
-            UnloadAssetBundleInternal(assetBundleName);
-            UnloadDependencies(assetBundleName);
-
-            //Debug.Log(m_LoadedAssetBundles.Count + " assetbundle(s) in memory after unloading " + assetBundleName);
-        }
-
-        static protected void UnloadDependencies(string assetBundleName)
-        {
-            string[] dependencies = null;
-            if (!m_Dependencies.TryGetValue(assetBundleName, out dependencies))
-                return;
-
-            // Loop dependencies.
-            foreach (var dependency in dependencies)
-            {
-                UnloadAssetBundleInternal(dependency);
-            }
-
-            m_Dependencies.Remove(assetBundleName);
-        }
-
-        static protected void UnloadAssetBundleInternal(string assetBundleName)
-        {
-            string error;
-            LoadedAssetBundle bundle = GetLoadedAssetBundle(assetBundleName, out error);
-            if (bundle == null)
-                return;
-
-            if (--bundle.m_ReferencedCount == 0)
-            {
-                bundle.m_AssetBundle.Unload(false);
-                m_LoadedAssetBundles.Remove(assetBundleName);
-
-                Log(LogType.Info, assetBundleName + " has been unloaded successfully");
             }
         }
 
@@ -589,7 +441,13 @@ namespace AssetBundles
             return operation;
         }
 
-        // Load level from the given assetBundle.
+        /// <summary>
+        /// Load level from the given assetBundle.
+        /// </summary>
+        /// <param name="assetBundleName"></param>
+        /// <param name="levelName"></param>
+        /// <param name="isAdditive"></param>
+        /// <returns></returns>
         static public AssetBundleLoadOperation LoadLevelAsync(string assetBundleName, string levelName, bool isAdditive)
         {
             Log(LogType.Info, "Loading " + levelName + " from " + assetBundleName + " bundle");
@@ -612,5 +470,189 @@ namespace AssetBundles
 
             return operation;
         }
-    } // End of AssetBundleManager.
+
+        #endregion 加载AssetBundle
+
+        #region 卸载AssetBundle
+
+        /// <summary>
+        /// Unload assetbundle and its dependencies.
+        /// </summary>
+        /// <param name="assetBundleName"></param>
+        static public void UnloadAssetBundle(string assetBundleName)
+        {
+#if UNITY_EDITOR
+            // If we're in Editor simulation mode, we don't have to load the manifest assetBundle.
+            if (SimulateAssetBundleInEditor)
+            {
+                return;
+            }
+#endif
+
+            //Debug.Log(m_LoadedAssetBundles.Count + " assetbundle(s) in memory before unloading " + assetBundleName);
+
+            UnloadAssetBundleInternal(assetBundleName);
+            UnloadDependencies(assetBundleName);
+
+            //Debug.Log(m_LoadedAssetBundles.Count + " assetbundle(s) in memory after unloading " + assetBundleName);
+        }
+
+        static protected void UnloadDependencies(string assetBundleName)
+        {
+            string[] dependencies = null;
+            if (!m_Dependencies.TryGetValue(assetBundleName, out dependencies))
+            {
+                return;
+            }
+
+            // Loop dependencies.
+            foreach (var dependency in dependencies)
+            {
+                UnloadAssetBundleInternal(dependency);
+            }
+
+            m_Dependencies.Remove(assetBundleName);
+        }
+
+        static protected void UnloadAssetBundleInternal(string assetBundleName)
+        {
+            string error;
+            LoadedAssetBundle bundle = GetLoadedAssetBundle(assetBundleName, out error);
+            if (bundle == null)
+            {
+                return;
+            }
+
+            if (--bundle.m_ReferencedCount == 0)
+            {
+                bundle.m_AssetBundle.Unload(false);
+                m_LoadedAssetBundles.Remove(assetBundleName);
+
+                Log(LogType.Info, assetBundleName + " has been unloaded successfully");
+            }
+        }
+
+        #endregion 卸载AssetBundle
+
+        #region 辅助
+
+        /// <summary>
+        /// <para>获得加载好的AssetBundle</para>
+        /// <para>Get loaded AssetBundle, only return vaild object when all the dependencies are downloaded successfully.</para>
+        /// </summary>
+        /// <param name="assetBundleName"></param>
+        /// <param name="error"></param>
+        /// <returns></returns>
+        static public LoadedAssetBundle GetLoadedAssetBundle(string assetBundleName, out string error)
+        {
+            if (m_DownloadingErrors.TryGetValue(assetBundleName, out error))
+            {
+                return null;
+            }
+
+            LoadedAssetBundle bundle = null;
+            m_LoadedAssetBundles.TryGetValue(assetBundleName, out bundle);
+            if (bundle == null)
+            {
+                return null;
+            }
+
+            // No dependencies are recorded, only the bundle itself is required.
+            string[] dependencies = null;
+            if (!m_Dependencies.TryGetValue(assetBundleName, out dependencies))
+            {
+                return bundle;
+            }
+
+            // Make sure all dependencies are loaded
+            foreach (var dependency in dependencies)
+            {
+                if (m_DownloadingErrors.TryGetValue(assetBundleName, out error))
+                {
+                    return bundle;
+                }
+
+                // Wait all the dependent assetBundles being loaded.
+                LoadedAssetBundle dependentBundle;
+                m_LoadedAssetBundles.TryGetValue(dependency, out dependentBundle);
+                if (dependentBundle == null)
+                {
+                    return null;
+                }
+            }
+
+            return bundle;
+        }
+
+        // Remaps the asset bundle name to the best fitting asset bundle variant.
+        static protected string RemapVariantName(string assetBundleName)
+        {
+            string[] bundlesWithVariant = m_AssetBundleManifest.GetAllAssetBundlesWithVariant();
+
+            string[] split = assetBundleName.Split('.');
+
+            int bestFit = int.MaxValue;
+            int bestFitIndex = -1;
+            // Loop all the assetBundles with variant to find the best fit variant assetBundle.
+            for (int i = 0; i < bundlesWithVariant.Length; i++)
+            {
+                string[] curSplit = bundlesWithVariant[i].Split('.');
+                if (curSplit[0] != split[0])
+                    continue;
+
+                int found = System.Array.IndexOf(m_ActiveVariants, curSplit[1]);
+
+                // If there is no active variant found. We still want to use the first 
+                if (found == -1)
+                    found = int.MaxValue - 1;
+
+                if (found < bestFit)
+                {
+                    bestFit = found;
+                    bestFitIndex = i;
+                }
+            }
+
+            if (bestFit == int.MaxValue - 1)
+            {
+                Debug.LogWarning("Ambigious asset bundle variant chosen because there was no matching active variant: " + bundlesWithVariant[bestFitIndex]);
+            }
+
+            if (bestFitIndex != -1)
+            {
+                return bundlesWithVariant[bestFitIndex];
+            }
+            else
+            {
+                return assetBundleName;
+            }
+        }
+
+        /// <summary>
+        /// 后期移走
+        /// </summary>
+        /// <returns></returns>
+        private static string GetStreamingAssetsPath()
+        {
+            if (Application.isEditor)
+            {
+                //Use the build output folder directly.
+                return "file://" + System.Environment.CurrentDirectory.Replace("\\", "/");
+            }
+            else if (Application.isWebPlayer)
+            {
+                return System.IO.Path.GetDirectoryName(Application.absoluteURL).Replace("\\", "/") + "/StreamingAssets";
+            }
+            else if (Application.isMobilePlatform || Application.isConsolePlatform)
+            {
+                return Application.streamingAssetsPath;
+            }
+            else //For standalone player.
+            {
+                return "file://" + Application.streamingAssetsPath;
+            }
+        }
+
+        #endregion 辅助
+    }
 }
