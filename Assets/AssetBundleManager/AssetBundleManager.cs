@@ -598,13 +598,17 @@ namespace AssetBundles
             {
                 string[] curSplit = bundlesWithVariant[i].Split('.');
                 if (curSplit[0] != split[0])
+                {
                     continue;
+                }
 
                 int found = System.Array.IndexOf(m_ActiveVariants, curSplit[1]);
 
                 // If there is no active variant found. We still want to use the first 
                 if (found == -1)
-                    found = int.MaxValue - 1;
+                {
+                    found = int.MaxValue - 1; 
+                }
 
                 if (found < bestFit)
                 {

@@ -95,18 +95,20 @@ namespace AssetBundles
         public override bool Update()
         {
             if (m_Request != null)
+            {
                 return false;
+            }
 
             LoadedAssetBundle bundle = AssetBundleManager.GetLoadedAssetBundle(m_AssetBundleName, out m_DownloadingError);
             if (bundle != null)
             {
                 if (m_IsAdditive)
                 {
-                    m_Request = SceneManager.LoadSceneAsync(m_LevelName);
+                    m_Request = SceneManager.LoadSceneAsync(m_LevelName, LoadSceneMode.Additive);
                 }
                 else
                 {
-                    m_Request = SceneManager.LoadSceneAsync(m_LevelName);
+                    m_Request = SceneManager.LoadSceneAsync(m_LevelName, LoadSceneMode.Single);
                 }
                 return false;
             }
