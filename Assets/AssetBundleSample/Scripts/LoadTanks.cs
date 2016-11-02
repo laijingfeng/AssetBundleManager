@@ -120,7 +120,8 @@ public class LoadTanks : MonoBehaviour
         // (This is very dependent on the production workflow of the project. 
         // 	Another approach would be to make this configurable in the standalone player.)
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
-        AssetBundleManager.SetDevelopmentAssetBundleServer();
+        //AssetBundleManager.SetDevelopmentAssetBundleServer();
+        AssetBundleManager.SetSourceAssetBundleURL(Utility.GetStreamingAssetsPath());
 #else
 		// Use the following code if AssetBundles are side-by-side with web deployment:
 		AssetBundleManager.SetSourceAssetBundleURL(Application.dataPath + "/");
@@ -132,7 +133,9 @@ public class LoadTanks : MonoBehaviour
         var request = AssetBundleManager.Initialize();
 
         if (request != null)
+        {
             yield return StartCoroutine(request);
+        }
     }
 
     protected IEnumerator InitializeLevelAsync(string levelName, bool isAdditive)
@@ -143,7 +146,9 @@ public class LoadTanks : MonoBehaviour
         // Load level from assetBundle.
         AssetBundleLoadOperation request = AssetBundleManager.LoadLevelAsync(sceneAssetBundle, levelName, isAdditive);
         if (request == null)
+        {
             yield break;
+        }
 
         yield return StartCoroutine(request);
 
@@ -171,9 +176,13 @@ public class LoadTanks : MonoBehaviour
 
         // Instantiate the Asset, or log an error.
         if (prefab != null)
+        {
             GameObject.Instantiate(prefab);
+        }
         else
+        {
             Debug.LogError("Failed to GetAsset from request");
+        }
 
         // Calculate and display the elapsed time.
         float elapsedTime = Time.realtimeSinceStartup - startTime;
