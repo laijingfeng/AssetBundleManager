@@ -113,7 +113,9 @@ namespace AssetBundles
                 return false;
             }
             else
+            {
                 return true;
+            }
         }
 
         public override bool IsDone()

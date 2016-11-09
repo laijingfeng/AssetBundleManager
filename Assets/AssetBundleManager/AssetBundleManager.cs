@@ -109,7 +109,10 @@ namespace AssetBundles
             set { m_ActiveVariants = value; }
         }
 
-        // AssetBundleManifest object which can be used to load the dependecies and check suitable assetBundle variants.
+        /// <summary>
+        /// <para>根Manifest</para>
+        /// <para>AssetBundleManifest object which can be used to load the dependecies and check suitable assetBundle variants.</para>
+        /// </summary>
         public static AssetBundleManifest AssetBundleManifestObject
         {
             set { m_AssetBundleManifest = value; }
@@ -198,6 +201,10 @@ namespace AssetBundles
 
         #region 初始化
 
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns></returns>
         static public AssetBundleLoadManifestOperation Initialize()
         {
             return Initialize(Utility.GetPlatformName());
@@ -208,7 +215,7 @@ namespace AssetBundles
         /// </summary>
         /// <param name="manifestAssetBundleName"></param>
         /// <returns></returns>
-        static public AssetBundleLoadManifestOperation Initialize(string manifestAssetBundleName)
+        static protected AssetBundleLoadManifestOperation Initialize(string manifestAssetBundleName)
         {
 #if UNITY_EDITOR
             Log(LogType.Info, "Simulation Mode: " + (SimulateAssetBundleInEditor ? "Enabled" : "Disabled"));
