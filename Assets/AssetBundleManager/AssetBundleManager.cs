@@ -553,7 +553,7 @@ namespace AssetBundles
         #region 辅助
 
         /// <summary>
-        /// <para>获得加载好的AssetBundle</para>
+        /// <para>获得加载好的AssetBundle，依赖都加载好了才算好</para>
         /// <para>Get loaded AssetBundle, only return vaild object when all the dependencies are downloaded successfully.</para>
         /// </summary>
         /// <param name="assetBundleName"></param>
@@ -608,22 +608,10 @@ namespace AssetBundles
         static protected string RemapVariantName(string assetBundleName)
         {
             string[] bundlesWithVariant = m_AssetBundleManifest.GetAllAssetBundlesWithVariant();
-
             string[] split = assetBundleName.Split('.');
-
-            foreach (string b in bundlesWithVariant)
-            {
-                Debug.LogError("变体bundle:" + b);
-            }
-
-            foreach (string s in split)
-            {
-                Debug.LogError("s:" + s);
-            }
 
             int bestFit = int.MaxValue;
             int bestFitIndex = -1;
-            // Loop all the assetBundles with variant to find the best fit variant assetBundle.
             for (int i = 0; i < bundlesWithVariant.Length; i++)
             {
                 //匹配bundle名
@@ -634,8 +622,8 @@ namespace AssetBundles
                 }
 
                 int found = System.Array.IndexOf(m_ActiveVariants, curSplit[1]);
-
-                // If there is no active variant found. We still want to use the first 
+ 
+                //如果指定的变体里没有，则使用第一个
                 if (found == -1)
                 {
                     found = int.MaxValue - 1; 
@@ -652,8 +640,6 @@ namespace AssetBundles
             {
                 Debug.LogWarning("Ambigious asset bundle variant chosen because there was no matching active variant: " + bundlesWithVariant[bestFitIndex]);
             }
-
-            Debug.LogError(bestFitIndex + " ");
 
             if (bestFitIndex != -1)
             {
