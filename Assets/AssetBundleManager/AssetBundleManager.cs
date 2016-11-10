@@ -55,6 +55,10 @@ namespace AssetBundles
 
         static LogMode m_LogMode = LogMode.All;
         static string m_BaseDownloadingURL = "";
+        
+        /// <summary>
+        /// 设定要使用的变体名
+        /// </summary>
         static string[] m_ActiveVariants = { };
 
         /// <summary>
@@ -438,7 +442,10 @@ namespace AssetBundles
             else
 #endif
             {
+                Debug.LogError("name1:" + assetBundleName);
                 assetBundleName = RemapVariantName(assetBundleName);
+                Debug.LogError("name2:" + assetBundleName);
+
                 LoadAssetBundle(assetBundleName);
                 operation = new AssetBundleLoadAssetOperationFull(assetBundleName, assetName, type);
 
@@ -468,7 +475,9 @@ namespace AssetBundles
             else
 #endif
             {
+                Debug.LogError("name1:" + assetBundleName);
                 assetBundleName = RemapVariantName(assetBundleName);
+                Debug.LogError("name2:" + assetBundleName);
                 LoadAssetBundle(assetBundleName);
                 operation = new AssetBundleLoadLevelOperation(assetBundleName, levelName, isAdditive);
 
@@ -591,18 +600,33 @@ namespace AssetBundles
             return bundle;
         }
 
-        // Remaps the asset bundle name to the best fitting asset bundle variant.
+        /// <summary>
+        /// bundle名检查变体
+        /// </summary>
+        /// <param name="assetBundleName"></param>
+        /// <returns></returns>
         static protected string RemapVariantName(string assetBundleName)
         {
             string[] bundlesWithVariant = m_AssetBundleManifest.GetAllAssetBundlesWithVariant();
 
             string[] split = assetBundleName.Split('.');
 
+            foreach (string b in bundlesWithVariant)
+            {
+                Debug.LogError("变体bundle:" + b);
+            }
+
+            foreach (string s in split)
+            {
+                Debug.LogError("s:" + s);
+            }
+
             int bestFit = int.MaxValue;
             int bestFitIndex = -1;
             // Loop all the assetBundles with variant to find the best fit variant assetBundle.
             for (int i = 0; i < bundlesWithVariant.Length; i++)
             {
+                //匹配bundle名
                 string[] curSplit = bundlesWithVariant[i].Split('.');
                 if (curSplit[0] != split[0])
                 {
@@ -628,6 +652,8 @@ namespace AssetBundles
             {
                 Debug.LogWarning("Ambigious asset bundle variant chosen because there was no matching active variant: " + bundlesWithVariant[bestFitIndex]);
             }
+
+            Debug.LogError(bestFitIndex + " ");
 
             if (bestFitIndex != -1)
             {
