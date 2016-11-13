@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEngine.SceneManagement;
+using System;
 
 namespace JAB
 {
@@ -11,7 +12,7 @@ namespace JAB
     public abstract class AssetBundleLoadOperation : IEnumerator
     {
         #region 系统
-        
+
         public object Current
         {
             get
@@ -28,11 +29,11 @@ namespace JAB
         public void Reset()
         {
         }
-        
+
         #endregion 系统
 
         /// <summary>
-        /// 是否需要更新，不需要则是好了
+        /// 等候m_Request构建好，返回值表示是否还需要更新
         /// </summary>
         /// <returns></returns>
         abstract public bool Update();

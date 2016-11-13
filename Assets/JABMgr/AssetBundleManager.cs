@@ -3,32 +3,11 @@
 using UnityEditor;
 #endif
 using System.Collections.Generic;
+using System;
+using System.Collections;
 
 namespace JAB
 {
-    /// <summary>
-    /// <para>Loaded assetBundle contains the references count which can be used to unload dependent assetBundles automatically.</para>
-    /// <para>加载好的Bundle</para>
-    /// </summary>
-    public class LoadedAssetBundle
-    {
-        /// <summary>
-        /// Bundle
-        /// </summary>
-        public AssetBundle m_AssetBundle;
-
-        /// <summary>
-        /// 引用计数
-        /// </summary>
-        public int m_ReferencedCount;
-
-        public LoadedAssetBundle(AssetBundle assetBundle)
-        {
-            m_AssetBundle = assetBundle;
-            m_ReferencedCount = 1;
-        }
-    }
-
     /// <summary>
     /// Class takes care of loading assetBundle and its dependencies automatically, loading variants automatically.
     /// </summary>
@@ -39,6 +18,21 @@ namespace JAB
 
         #region 变量
 
+        static private AssetBundleManager m_ABLoaderMgr;
+        static private AssetBundleManager ABLoaderMgr
+        {
+            get
+            {
+                if (m_ABLoaderMgr == null)
+                {
+                    GameObject go = new GameObject("AssetBundleManager", typeof(AssetBundleManager));
+                    DontDestroyOnLoad(go);
+                    m_ABLoaderMgr = go.GetComponent<AssetBundleManager>();
+                }
+                return m_ABLoaderMgr;
+            }
+        }
+
         static LogMode m_LogMode = LogMode.All;
         static string m_BaseDownloadingURL = "";
 
@@ -47,15 +41,41 @@ namespace JAB
         /// </summary>
         static string[] m_ActiveVariants = { };
 
+        #region 根Manifest
+
+        private static bool m_AssetBundleManifestLoading = false;
+
         /// <summary>
         /// 根Manifest
         /// </summary>
-        static AssetBundleManifest m_AssetBundleManifest = null;
+        private static AssetBundleManifest m_AssetBundleManifest = null;
+
+        /// <summary>
+        /// <para>根Manifest</para>
+        /// <para>AssetBundleManifest object which can be used to load the dependecies and check suitable assetBundle variants.</para>
+        /// </summary>
+        public static AssetBundleManifest AssetBundleManifestObject
+        {
+            set
+            {
+                m_AssetBundleManifest = value;
+                m_AssetBundleManifestLoading = false;
+            }
+        }
+
+        #endregion 根Manifest
 
         /// <summary>
         /// 加载好缓存的资源
         /// </summary>
         static Dictionary<string, LoadedAssetBundle> m_LoadedAssetBundles = new Dictionary<string, LoadedAssetBundle>();
+        
+        static private string m_ManifestBundleName;
+        /// <summary>
+        /// 加载Manifest的WWW
+        /// </summary>
+        static private WWW m_ManifestWWW; 
+        
         /// <summary>
         /// 正在加载的资源
         /// </summary>
@@ -93,15 +113,6 @@ namespace JAB
         {
             get { return m_ActiveVariants; }
             set { m_ActiveVariants = value; }
-        }
-
-        /// <summary>
-        /// <para>根Manifest</para>
-        /// <para>AssetBundleManifest object which can be used to load the dependecies and check suitable assetBundle variants.</para>
-        /// </summary>
-        public static AssetBundleManifest AssetBundleManifestObject
-        {
-            set { m_AssetBundleManifest = value; }
         }
 
         private static void Log(LogType logType, string text)
@@ -148,37 +159,6 @@ namespace JAB
         }
 
         #endregion 设置
-
-        #region 初始化
-
-        /// <summary>
-        /// 初始化
-        /// </summary>
-        /// <returns></returns>
-        static public AssetBundleLoadManifestOperation Initialize()
-        {
-            return Initialize(Utility.GetPlatformName());
-        }
-
-        /// <summary>
-        /// Load AssetBundleManifest.
-        /// </summary>
-        /// <param name="manifestAssetBundleName"></param>
-        /// <returns></returns>
-        static protected AssetBundleLoadManifestOperation Initialize(string manifestAssetBundleName)
-        {
-            var go = new GameObject("AssetBundleManager", typeof(AssetBundleManager));
-            DontDestroyOnLoad(go);
-
-            LoadAssetBundle(manifestAssetBundleName, true);
-
-            //AssetName是固定的AssetBundleManifest
-            var operation = new AssetBundleLoadManifestOperation(manifestAssetBundleName, "AssetBundleManifest", typeof(AssetBundleManifest));
-            m_InProgressOperations.Add(operation);
-            return operation;
-        }
-
-        #endregion 初始化
 
         #region 加载AssetBundle
 
@@ -235,20 +215,18 @@ namespace JAB
                 return true;
             }
 
-            WWW download = null;
             string url = m_BaseDownloadingURL + assetBundleName;
 
             // For manifest assetbundle, always download it as we don't have hash for it.
             if (isLoadingAssetBundleManifest)
             {
-                download = new WWW(url);
+                m_ManifestBundleName = assetBundleName;
+                m_ManifestWWW = new WWW(url);
             }
             else
             {
-                download = WWW.LoadFromCacheOrDownload(url, m_AssetBundleManifest.GetAssetBundleHash(assetBundleName), 0);
+                m_DownloadingWWWs.Add(assetBundleName, WWW.LoadFromCacheOrDownload(url, m_AssetBundleManifest.GetAssetBundleHash(assetBundleName), 0));
             }
-
-            m_DownloadingWWWs.Add(assetBundleName, download);
 
             return false;
         }
@@ -286,44 +264,74 @@ namespace JAB
             }
         }
 
+        private bool UpdateManifest()
+        {
+            if (m_AssetBundleManifest != null)
+            {
+                return true;
+            }
+            if (m_ManifestWWW == null)
+            {
+                return false;
+            }
+            if (m_ManifestWWW.error != null)
+            {
+                Debug.LogError("Manifest Load Error " + m_ManifestWWW.error);
+                return false;
+            }
+            if (m_ManifestWWW.isDone)
+            {
+                AssetBundle bundle = m_ManifestWWW.assetBundle;
+                if (bundle != null)
+                {
+                    m_LoadedAssetBundles.Add(m_ManifestBundleName, new LoadedAssetBundle(bundle));
+                }
+                return true;
+            }
+            return false;
+        }
+
         void Update()
         {
-            // Collect all the finished WWWs.
-            var keysToRemove = new List<string>();
-            foreach (var keyValue in m_DownloadingWWWs)
+            if (UpdateManifest() == true)
             {
-                WWW download = keyValue.Value;
-
-                // If downloading fails.
-                if (download.error != null)
+                // Collect all the finished WWWs.
+                var keysToRemove = new List<string>();
+                foreach (var keyValue in m_DownloadingWWWs)
                 {
-                    m_DownloadingErrors.Add(keyValue.Key, string.Format("Failed downloading bundle {0} from {1}: {2}", keyValue.Key, download.url, download.error));
-                    keysToRemove.Add(keyValue.Key);
-                    continue;
-                }
+                    WWW download = keyValue.Value;
 
-                // If downloading succeeds.
-                if (download.isDone)
-                {
-                    AssetBundle bundle = download.assetBundle;
-                    if (bundle == null)
+                    // If downloading fails.
+                    if (download.error != null)
                     {
-                        m_DownloadingErrors.Add(keyValue.Key, string.Format("{0} is not a valid asset bundle.", keyValue.Key));
+                        m_DownloadingErrors.Add(keyValue.Key, string.Format("Failed downloading bundle {0} from {1}: {2}", keyValue.Key, download.url, download.error));
                         keysToRemove.Add(keyValue.Key);
                         continue;
                     }
 
-                    m_LoadedAssetBundles.Add(keyValue.Key, new LoadedAssetBundle(download.assetBundle));
-                    keysToRemove.Add(keyValue.Key);
-                }
-            }
+                    // If downloading succeeds.
+                    if (download.isDone)
+                    {
+                        AssetBundle bundle = download.assetBundle;
+                        if (bundle == null)
+                        {
+                            m_DownloadingErrors.Add(keyValue.Key, string.Format("{0} is not a valid asset bundle.", keyValue.Key));
+                            keysToRemove.Add(keyValue.Key);
+                            continue;
+                        }
 
-            // Remove the finished WWWs.
-            foreach (var key in keysToRemove)
-            {
-                WWW download = m_DownloadingWWWs[key];
-                m_DownloadingWWWs.Remove(key);
-                download.Dispose();
+                        m_LoadedAssetBundles.Add(keyValue.Key, new LoadedAssetBundle(bundle));
+                        keysToRemove.Add(keyValue.Key);
+                    }
+                }
+
+                // Remove the finished WWWs.
+                foreach (var key in keysToRemove)
+                {
+                    WWW download = m_DownloadingWWWs[key];
+                    m_DownloadingWWWs.Remove(key);
+                    download.Dispose();
+                }
             }
 
             // Update all in progress operations
@@ -341,23 +349,48 @@ namespace JAB
         }
 
         /// <summary>
-        /// Load asset from the given assetBundle.
+        /// 异步加载，回调形式，不用关心过程
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="assetBundleName"></param>
+        /// <param name="assetName"></param>
+        /// <param name="callback"></param>
+        static public void LoadAssetAsync<T>(string assetBundleName, string assetName, Action<T> callback) where T : UnityEngine.Object
+        {
+            ABLoaderMgr.StartCoroutine(IE_LoadAssetAsync<T>(LoadAssetAsync<T>(assetBundleName, assetName), callback, null));
+        }
+
+        /// <summary>
+        /// 异步加载，返回Operation，可以自己控制多个加载的时序
         /// </summary>
         /// <param name="assetBundleName"></param>
         /// <param name="assetName"></param>
         /// <param name="type"></param>
         /// <returns></returns>
-        static public AssetBundleLoadAssetOperation LoadAssetAsync(string assetBundleName, string assetName, System.Type type)
+        static public AssetBundleLoadAssetOperation LoadAssetAsync<T>(string assetBundleName, string assetName) where T : UnityEngine.Object
         {
             Log(LogType.Info, "Loading " + assetName + " from " + assetBundleName + " bundle");
 
+            LoadManifest();
+
             assetBundleName = RemapVariantName(assetBundleName);
             LoadAssetBundle(assetBundleName);
-            AssetBundleLoadAssetOperation operation = new AssetBundleLoadAssetOperation(assetBundleName, assetName, type);
+            AssetBundleLoadAssetOperation operation = new AssetBundleLoadAssetOperation(assetBundleName, assetName, typeof(T));
 
             m_InProgressOperations.Add(operation);
 
             return operation;
+        }
+
+        /// <summary>
+        /// 异步加载，回调形式，不用关心过程
+        /// </summary>
+        /// <param name="assetBundleName"></param>
+        /// <param name="assetName"></param>
+        /// <param name="callback"></param>
+        static public void LoadLevelAsync(string assetBundleName, string levelName, bool isAdditive, Action<bool> callback)
+        {
+            ABLoaderMgr.StartCoroutine(IE_LoadAssetAsync<GameObject>(LoadLevelAsync(assetBundleName, levelName, isAdditive), null, callback));
         }
 
         /// <summary>
@@ -371,15 +404,57 @@ namespace JAB
         {
             Log(LogType.Info, "Loading " + levelName + " from " + assetBundleName + " bundle");
 
-            Debug.LogError("name1:" + assetBundleName);
+            LoadManifest();
+
             assetBundleName = RemapVariantName(assetBundleName);
-            Debug.LogError("name2:" + assetBundleName);
             LoadAssetBundle(assetBundleName);
             AssetBundleLoadOperation operation = new AssetBundleLoadLevelOperation(assetBundleName, levelName, isAdditive);
 
             m_InProgressOperations.Add(operation);
 
             return operation;
+        }
+
+        static private IEnumerator IE_LoadAssetAsync<T>(AssetBundleLoadOperation request, Action<T> assetCallback = null, Action<bool> levelCallBack = null) where T : UnityEngine.Object
+        {
+            if (request == null)
+            {
+                if (assetCallback != null)
+                {
+                    assetCallback(null);
+                }
+                if (levelCallBack != null)
+                {
+                    levelCallBack(false);
+                }
+                yield break;
+            }
+            yield return ABLoaderMgr.StartCoroutine(request);
+            if (assetCallback != null)
+            {
+                assetCallback((request as AssetBundleLoadAssetOperation).GetAsset<T>());
+            }
+            if (levelCallBack != null)
+            {
+                levelCallBack(true);
+            }
+        }
+
+        static protected void LoadManifest()
+        {
+            if (m_AssetBundleManifest != null || m_AssetBundleManifestLoading == true)
+            {
+                return;
+            }
+
+            if (ABLoaderMgr == null)
+            {
+                m_ABLoaderMgr = ABLoaderMgr;
+            }
+            string manifestAssetBundleName = Utility.GetPlatformName();
+            LoadAssetBundle(manifestAssetBundleName, true);
+            m_InProgressOperations.Add(new AssetBundleLoadManifestOperation(manifestAssetBundleName, "AssetBundleManifest", typeof(AssetBundleManifest)));
+            m_AssetBundleManifestLoading = true;
         }
 
         #endregion 加载AssetBundle
@@ -564,5 +639,28 @@ namespace JAB
         }
 
         #endregion 辅助
+    }
+
+    /// <summary>
+    /// <para>Loaded assetBundle contains the references count which can be used to unload dependent assetBundles automatically.</para>
+    /// <para>加载好的Bundle</para>
+    /// </summary>
+    public class LoadedAssetBundle
+    {
+        /// <summary>
+        /// Bundle
+        /// </summary>
+        public AssetBundle m_AssetBundle;
+
+        /// <summary>
+        /// 引用计数
+        /// </summary>
+        public int m_ReferencedCount;
+
+        public LoadedAssetBundle(AssetBundle assetBundle)
+        {
+            m_AssetBundle = assetBundle;
+            m_ReferencedCount = 1;
+        }
     }
 }
