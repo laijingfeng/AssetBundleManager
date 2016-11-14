@@ -11,9 +11,7 @@ public class LoadAssets : MonoBehaviour
     // Use this for initialization
     IEnumerator Start()
     {
-        Initialize();
-
-        Utility.LaiDebug("load");
+        yield return this.StartCoroutine(Initialize());
 
         // Load asset.
         yield return StartCoroutine(InstantiateGameObjectAsync(assetBundleName, assetName));
@@ -23,7 +21,7 @@ public class LoadAssets : MonoBehaviour
     /// Initialize the downloading url and AssetBundleManifest object.
     /// </summary>
     /// <returns></returns>
-    protected void Initialize()
+    protected IEnumerator Initialize()
     {
         // Don't destroy this gameObject as we depend on it to run the loading script.
         DontDestroyOnLoad(gameObject);
@@ -41,6 +39,13 @@ public class LoadAssets : MonoBehaviour
 		// Or customize the URL based on your deployment or configuration
 		//AssetBundleManager.SetSourceAssetBundleURL("http://www.MyWebsite/MyAssetBundles");
 #endif
+
+        AssetBundleLoadManifestOperation request = AssetBundleManager.LoadManifest();
+        if (request == null)
+        {
+            yield break;
+        }
+        yield return this.StartCoroutine(request);
     }
 
     protected IEnumerator InstantiateGameObjectAsync(string assetBundleName, string assetName)
@@ -48,7 +53,7 @@ public class LoadAssets : MonoBehaviour
         // This is simply to get the elapsed time for this phase of AssetLoading.
         float startTime = Time.realtimeSinceStartup;
 
-        bool newMethod = false;
+        bool newMethod = true;
 
         if (newMethod)
         {

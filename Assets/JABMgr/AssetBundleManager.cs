@@ -43,8 +43,6 @@ namespace JAB
 
         #region 根Manifest
 
-        private static bool m_AssetBundleManifestLoading = false;
-
         /// <summary>
         /// 根Manifest
         /// </summary>
@@ -59,7 +57,6 @@ namespace JAB
             set
             {
                 m_AssetBundleManifest = value;
-                m_AssetBundleManifestLoading = false;
             }
         }
 
@@ -69,12 +66,6 @@ namespace JAB
         /// 加载好缓存的资源
         /// </summary>
         static Dictionary<string, LoadedAssetBundle> m_LoadedAssetBundles = new Dictionary<string, LoadedAssetBundle>();
-        
-        static private string m_ManifestBundleName;
-        /// <summary>
-        /// 加载Manifest的WWW
-        /// </summary>
-        static private WWW m_ManifestWWW; 
         
         /// <summary>
         /// 正在加载的资源
@@ -180,8 +171,9 @@ namespace JAB
                 }
             }
 
+            WWW www = null;
             // Check if the assetBundle has already been processed.
-            bool isAlreadyProcessed = LoadAssetBundleInternal(assetBundleName, isLoadingAssetBundleManifest);
+            bool isAlreadyProcessed = LoadAssetBundleInternal(assetBundleName, isLoadingAssetBundleManifest, out www);
 
             // Load dependencies.
             if (!isAlreadyProcessed && !isLoadingAssetBundleManifest)
@@ -191,13 +183,16 @@ namespace JAB
         }
 
         /// <summary>
-        /// Where we actuall call WWW to download the assetBundle.
+        /// <para>开放给外界，可以预先加载AB，并且统计进度</para>
+        /// <para>Where we actuall call WWW to download the assetBundle.</para>
         /// </summary>
         /// <param name="assetBundleName"></param>
         /// <param name="isLoadingAssetBundleManifest"></param>
         /// <returns></returns>
-        static protected bool LoadAssetBundleInternal(string assetBundleName, bool isLoadingAssetBundleManifest)
+        static public bool LoadAssetBundleInternal(string assetBundleName, bool isLoadingAssetBundleManifest, out WWW www)
         {
+            www = null;
+
             // Already loaded.
             LoadedAssetBundle bundle = null;
             m_LoadedAssetBundles.TryGetValue(assetBundleName, out bundle);
@@ -212,6 +207,7 @@ namespace JAB
             // But in the real case, users can call LoadAssetAsync()/LoadLevelAsync() several times then wait them to be finished which might have duplicate WWWs.
             if (m_DownloadingWWWs.ContainsKey(assetBundleName))
             {
+                www = m_DownloadingWWWs[assetBundleName];
                 return true;
             }
 
@@ -220,13 +216,14 @@ namespace JAB
             // For manifest assetbundle, always download it as we don't have hash for it.
             if (isLoadingAssetBundleManifest)
             {
-                m_ManifestBundleName = assetBundleName;
-                m_ManifestWWW = new WWW(url);
+                www = new WWW(url);
             }
             else
             {
-                m_DownloadingWWWs.Add(assetBundleName, WWW.LoadFromCacheOrDownload(url, m_AssetBundleManifest.GetAssetBundleHash(assetBundleName), 0));
+                www = WWW.LoadFromCacheOrDownload(url, m_AssetBundleManifest.GetAssetBundleHash(assetBundleName), 0);
             }
+
+            m_DownloadingWWWs.Add(assetBundleName, www);
 
             return false;
         }
@@ -258,80 +255,51 @@ namespace JAB
 
             // Record and load all dependencies.
             m_Dependencies.Add(assetBundleName, dependencies);
+            WWW www = null;
             for (int i = 0; i < dependencies.Length; i++)
             {
-                LoadAssetBundleInternal(dependencies[i], false);
+                LoadAssetBundleInternal(dependencies[i], false, out www);
             }
-        }
-
-        private bool UpdateManifest()
-        {
-            if (m_AssetBundleManifest != null)
-            {
-                return true;
-            }
-            if (m_ManifestWWW == null)
-            {
-                return false;
-            }
-            if (m_ManifestWWW.error != null)
-            {
-                Debug.LogError("Manifest Load Error " + m_ManifestWWW.error);
-                return false;
-            }
-            if (m_ManifestWWW.isDone)
-            {
-                AssetBundle bundle = m_ManifestWWW.assetBundle;
-                if (bundle != null)
-                {
-                    m_LoadedAssetBundles.Add(m_ManifestBundleName, new LoadedAssetBundle(bundle));
-                }
-                return true;
-            }
-            return false;
         }
 
         void Update()
         {
-            if (UpdateManifest() == true)
+            // Collect all the finished WWWs.
+            var keysToRemove = new List<string>();
+            foreach (var keyValue in m_DownloadingWWWs)
             {
-                // Collect all the finished WWWs.
-                var keysToRemove = new List<string>();
-                foreach (var keyValue in m_DownloadingWWWs)
-                {
-                    WWW download = keyValue.Value;
+                WWW download = keyValue.Value;
 
-                    // If downloading fails.
-                    if (download.error != null)
+                // If downloading fails.
+                if (download.error != null)
+                {
+                    m_DownloadingErrors.Add(keyValue.Key, string.Format("Failed downloading bundle {0} from {1}: {2}", keyValue.Key, download.url, download.error));
+                    keysToRemove.Add(keyValue.Key);
+                    continue;
+                }
+
+                // If downloading succeeds.
+                if (download.isDone)
+                {
+                    AssetBundle bundle = download.assetBundle;
+                    if (bundle == null)
                     {
-                        m_DownloadingErrors.Add(keyValue.Key, string.Format("Failed downloading bundle {0} from {1}: {2}", keyValue.Key, download.url, download.error));
+                        m_DownloadingErrors.Add(keyValue.Key, string.Format("{0} is not a valid asset bundle.", keyValue.Key));
                         keysToRemove.Add(keyValue.Key);
                         continue;
                     }
 
-                    // If downloading succeeds.
-                    if (download.isDone)
-                    {
-                        AssetBundle bundle = download.assetBundle;
-                        if (bundle == null)
-                        {
-                            m_DownloadingErrors.Add(keyValue.Key, string.Format("{0} is not a valid asset bundle.", keyValue.Key));
-                            keysToRemove.Add(keyValue.Key);
-                            continue;
-                        }
-
-                        m_LoadedAssetBundles.Add(keyValue.Key, new LoadedAssetBundle(bundle));
-                        keysToRemove.Add(keyValue.Key);
-                    }
+                    m_LoadedAssetBundles.Add(keyValue.Key, new LoadedAssetBundle(bundle));
+                    keysToRemove.Add(keyValue.Key);
                 }
+            }
 
-                // Remove the finished WWWs.
-                foreach (var key in keysToRemove)
-                {
-                    WWW download = m_DownloadingWWWs[key];
-                    m_DownloadingWWWs.Remove(key);
-                    download.Dispose();
-                }
+            // Remove the finished WWWs.
+            foreach (var key in keysToRemove)
+            {
+                WWW download = m_DownloadingWWWs[key];
+                m_DownloadingWWWs.Remove(key);
+                download.Dispose();
             }
 
             // Update all in progress operations
@@ -352,7 +320,7 @@ namespace JAB
         /// 异步加载，回调形式，不用关心过程
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="assetBundleName"></param>
+        /// <param name="assetBundleName">包含变体</param>
         /// <param name="assetName"></param>
         /// <param name="callback"></param>
         static public void LoadAssetAsync<T>(string assetBundleName, string assetName, Action<T> callback) where T : UnityEngine.Object
@@ -363,7 +331,7 @@ namespace JAB
         /// <summary>
         /// 异步加载，返回Operation，可以自己控制多个加载的时序
         /// </summary>
-        /// <param name="assetBundleName"></param>
+        /// <param name="assetBundleName">包含变体</param>
         /// <param name="assetName"></param>
         /// <param name="type"></param>
         /// <returns></returns>
@@ -385,7 +353,7 @@ namespace JAB
         /// <summary>
         /// 异步加载，回调形式，不用关心过程
         /// </summary>
-        /// <param name="assetBundleName"></param>
+        /// <param name="assetBundleName">包含变体</param>
         /// <param name="assetName"></param>
         /// <param name="callback"></param>
         static public void LoadLevelAsync(string assetBundleName, string levelName, bool isAdditive, Action<bool> callback)
@@ -396,7 +364,7 @@ namespace JAB
         /// <summary>
         /// Load level from the given assetBundle.
         /// </summary>
-        /// <param name="assetBundleName"></param>
+        /// <param name="assetBundleName">包含变体</param>
         /// <param name="levelName"></param>
         /// <param name="isAdditive"></param>
         /// <returns></returns>
@@ -440,21 +408,24 @@ namespace JAB
             }
         }
 
-        static protected void LoadManifest()
+        static public AssetBundleLoadManifestOperation LoadManifest()
         {
-            if (m_AssetBundleManifest != null || m_AssetBundleManifestLoading == true)
+            if (m_AssetBundleManifest != null)
             {
-                return;
+                return null;
             }
 
             if (ABLoaderMgr == null)
             {
                 m_ABLoaderMgr = ABLoaderMgr;
             }
+
             string manifestAssetBundleName = Utility.GetPlatformName();
             LoadAssetBundle(manifestAssetBundleName, true);
-            m_InProgressOperations.Add(new AssetBundleLoadManifestOperation(manifestAssetBundleName, "AssetBundleManifest", typeof(AssetBundleManifest)));
-            m_AssetBundleManifestLoading = true;
+            AssetBundleLoadManifestOperation operation = new AssetBundleLoadManifestOperation(manifestAssetBundleName, "AssetBundleManifest", typeof(AssetBundleManifest));
+            m_InProgressOperations.Add(operation);
+            
+            return operation;
         }
 
         #endregion 加载AssetBundle

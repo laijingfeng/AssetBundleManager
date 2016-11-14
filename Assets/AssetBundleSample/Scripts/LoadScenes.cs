@@ -10,14 +10,14 @@ public class LoadScenes : MonoBehaviour
     // Use this for initialization
     IEnumerator Start()
     {
-        Initialize();
+        yield return this.StartCoroutine(Initialize());
 
         // Load level.
         yield return StartCoroutine(InitializeLevelAsync(sceneName, true));
     }
 
     // Initialize the downloading url and AssetBundleManifest object.
-    protected void Initialize()
+    protected IEnumerator Initialize()
     {
         // Don't destroy this gameObject as we depend on it to run the loading script.
         DontDestroyOnLoad(gameObject);
@@ -34,6 +34,13 @@ public class LoadScenes : MonoBehaviour
 		// Or customize the URL based on your deployment or configuration
 		//AssetBundleManager.SetSourceAssetBundleURL("http://www.MyWebsite/MyAssetBundles");
 #endif
+
+        AssetBundleLoadManifestOperation request = AssetBundleManager.LoadManifest();
+        if (request == null)
+        {
+            yield break;
+        }
+        yield return this.StartCoroutine(request);
     }
 
     protected IEnumerator InitializeLevelAsync(string levelName, bool isAdditive)
