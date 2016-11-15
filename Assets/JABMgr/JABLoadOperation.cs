@@ -9,7 +9,7 @@ namespace JAB
     /// <para>AssetBundle加载操作</para>
     /// <para>加载资源(Asset)的时候，等候AssetBundle的加载成功，再去AssetBundle里加载</para>
     /// </summary>
-    public abstract class AssetBundleLoadOperation : IEnumerator
+    public abstract class JABLoadOperation : IEnumerator
     {
         #region 系统
 
@@ -41,7 +41,7 @@ namespace JAB
         abstract public bool IsDone();
     }
 
-    public class AssetBundleLoadLevelOperation : AssetBundleLoadOperation
+    public class JABLoadLevelOperation : JABLoadOperation
     {
         protected string m_AssetBundleName;
         protected string m_LevelName;
@@ -49,7 +49,7 @@ namespace JAB
         protected string m_DownloadingError;
         protected AsyncOperation m_Request;
 
-        public AssetBundleLoadLevelOperation(string assetbundleName, string levelName, bool isAdditive)
+        public JABLoadLevelOperation(string assetbundleName, string levelName, bool isAdditive)
         {
             m_AssetBundleName = assetbundleName;
             m_LevelName = levelName;
@@ -63,7 +63,7 @@ namespace JAB
                 return false;
             }
 
-            LoadedAssetBundle bundle = AssetBundleManager.GetLoadedAssetBundle(m_AssetBundleName, out m_DownloadingError);
+            LoadedAssetBundle bundle = JABMgr.GetLoadedAssetBundle(m_AssetBundleName, out m_DownloadingError);
             if (bundle != null)
             {
                 if (m_IsAdditive)
@@ -96,7 +96,7 @@ namespace JAB
         }
     }
 
-    public class AssetBundleLoadAssetOperation : AssetBundleLoadOperation
+    public class JABLoadAssetOperation : JABLoadOperation
     {
         protected string m_AssetBundleName;
         protected string m_AssetName;
@@ -104,7 +104,7 @@ namespace JAB
         protected System.Type m_Type;
         protected AssetBundleRequest m_Request = null;
 
-        public AssetBundleLoadAssetOperation(string bundleName, string assetName, System.Type type)
+        public JABLoadAssetOperation(string bundleName, string assetName, System.Type type)
         {
             m_AssetBundleName = bundleName;
             m_AssetName = assetName;
@@ -134,7 +134,7 @@ namespace JAB
                 return false;
             }
 
-            LoadedAssetBundle bundle = AssetBundleManager.GetLoadedAssetBundle(m_AssetBundleName, out m_DownloadingError);
+            LoadedAssetBundle bundle = JABMgr.GetLoadedAssetBundle(m_AssetBundleName, out m_DownloadingError);
             if (bundle != null)
             {
                 ///@TODO: When asset bundle download fails this throws an exception...
@@ -161,9 +161,9 @@ namespace JAB
         }
     }
 
-    public class AssetBundleLoadManifestOperation : AssetBundleLoadAssetOperation
+    public class JABLoadManifestOperation : JABLoadAssetOperation
     {
-        public AssetBundleLoadManifestOperation(string bundleName, string assetName, System.Type type)
+        public JABLoadManifestOperation(string bundleName, string assetName, System.Type type)
             : base(bundleName, assetName, type)
         {
         }
@@ -174,7 +174,7 @@ namespace JAB
 
             if (m_Request != null && m_Request.isDone)
             {
-                AssetBundleManager.AssetBundleManifestObject = GetAsset<AssetBundleManifest>();
+                JABMgr.AssetBundleManifestObject = GetAsset<AssetBundleManifest>();
                 return false;
             }
             else

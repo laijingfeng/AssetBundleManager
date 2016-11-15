@@ -27,7 +27,7 @@ public class LoadScenes : MonoBehaviour
         // 	Another approach would be to make this configurable in the standalone player.)
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
         //AssetBundleManager.SetDevelopmentAssetBundleServer();
-        AssetBundleManager.SetSourceAssetBundleURL(Utility.GetStreamingAssetsPath());
+        JABMgr.SetSourceAssetBundleURL(JABUtil.GetStreamingAssetsPath());
 #else
 		// Use the following code if AssetBundles are embedded in the project for example via StreamingAssets folder etc:
 		AssetBundleManager.SetSourceAssetBundleURL(Application.dataPath + "/");
@@ -35,7 +35,7 @@ public class LoadScenes : MonoBehaviour
 		//AssetBundleManager.SetSourceAssetBundleURL("http://www.MyWebsite/MyAssetBundles");
 #endif
 
-        AssetBundleLoadManifestOperation request = AssetBundleManager.LoadManifest();
+        JABLoadManifestOperation request = JABMgr.LoadManifest();
         if (request == null)
         {
             yield break;
@@ -52,7 +52,7 @@ public class LoadScenes : MonoBehaviour
 
         if (newMethod)
         {
-            AssetBundleManager.LoadLevelAsync(sceneAssetBundle, levelName, isAdditive, (success) =>
+            JABMgr.LoadLevelAsync(sceneAssetBundle, levelName, isAdditive, (success) =>
             {
                 // Calculate and display the elapsed time.
                 float elapsedTime = Time.realtimeSinceStartup - startTime;
@@ -62,7 +62,7 @@ public class LoadScenes : MonoBehaviour
         else
         {
             // Load level from assetBundle.
-            AssetBundleLoadOperation request = AssetBundleManager.LoadLevelAsync(sceneAssetBundle, levelName, isAdditive);
+            JABLoadOperation request = JABMgr.LoadLevelAsync(sceneAssetBundle, levelName, isAdditive);
             if (request == null)
             {
                 yield break;

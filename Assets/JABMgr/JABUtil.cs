@@ -5,7 +5,7 @@ using UnityEditor;
 
 namespace JAB
 {
-    public class Utility
+    public class JABUtil
     {
         public const string AssetBundlesOutputPath = "AssetBundles";
 

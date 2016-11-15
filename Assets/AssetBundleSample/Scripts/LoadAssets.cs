@@ -32,7 +32,7 @@ public class LoadAssets : MonoBehaviour
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
         //AssetBundleManager.SetDevelopmentAssetBundleServer();
         //AssetBundleManager.SetSourceAssetBundleDirectory("/AssetBundles/Android/");
-        AssetBundleManager.SetSourceAssetBundleURL(Utility.GetStreamingAssetsPath());
+        JABMgr.SetSourceAssetBundleURL(JABUtil.GetStreamingAssetsPath());
 #else
 		// Use the following code if AssetBundles are embedded in the project for example via StreamingAssets folder etc:
 		AssetBundleManager.SetSourceAssetBundleURL(Application.streamingAssetsPath + "/");
@@ -40,7 +40,7 @@ public class LoadAssets : MonoBehaviour
 		//AssetBundleManager.SetSourceAssetBundleURL("http://www.MyWebsite/MyAssetBundles");
 #endif
 
-        AssetBundleLoadManifestOperation request = AssetBundleManager.LoadManifest();
+        JABLoadManifestOperation request = JABMgr.LoadManifest();
         if (request == null)
         {
             yield break;
@@ -57,7 +57,7 @@ public class LoadAssets : MonoBehaviour
 
         if (newMethod)
         {
-            AssetBundleManager.LoadAssetAsync<GameObject>(assetBundleName, assetName, (obj) =>
+            JABMgr.LoadAssetAsync<GameObject>(assetBundleName, assetName, (obj) =>
             {
                 if (obj != null)
                 {
@@ -72,7 +72,7 @@ public class LoadAssets : MonoBehaviour
         else
         {
             // Load asset from assetBundle.
-            AssetBundleLoadAssetOperation request = AssetBundleManager.LoadAssetAsync<GameObject>(assetBundleName, assetName);
+            JABLoadAssetOperation request = JABMgr.LoadAssetAsync<GameObject>(assetBundleName, assetName);
             if (request == null)
             {
                 yield break;

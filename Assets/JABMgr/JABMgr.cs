@@ -11,23 +11,23 @@ namespace JAB
     /// <summary>
     /// Class takes care of loading assetBundle and its dependencies automatically, loading variants automatically.
     /// </summary>
-    public class AssetBundleManager : MonoBehaviour
+    public class JABMgr : MonoBehaviour
     {
         public enum LogMode { All, JustErrors };
         public enum LogType { Info, Warning, Error };
 
         #region 变量
 
-        static private AssetBundleManager m_ABLoaderMgr;
-        static private AssetBundleManager ABLoaderMgr
+        static private JABMgr m_ABLoaderMgr;
+        static private JABMgr ABLoaderMgr
         {
             get
             {
                 if (m_ABLoaderMgr == null)
                 {
-                    GameObject go = new GameObject("AssetBundleManager", typeof(AssetBundleManager));
+                    GameObject go = new GameObject("AssetBundleManager", typeof(JABMgr));
                     DontDestroyOnLoad(go);
-                    m_ABLoaderMgr = go.GetComponent<AssetBundleManager>();
+                    m_ABLoaderMgr = go.GetComponent<JABMgr>();
                 }
                 return m_ABLoaderMgr;
             }
@@ -78,7 +78,7 @@ namespace JAB
         /// <summary>
         /// 操作队列
         /// </summary>
-        static List<AssetBundleLoadOperation> m_InProgressOperations = new List<AssetBundleLoadOperation>();
+        static List<JABLoadOperation> m_InProgressOperations = new List<JABLoadOperation>();
         /// <summary>
         /// 依赖表
         /// </summary>
@@ -129,7 +129,7 @@ namespace JAB
 
         public static void SetSourceAssetBundleURL(string absolutePath)
         {
-            BaseDownloadingURL = absolutePath + Utility.GetPlatformName() + "/";
+            BaseDownloadingURL = absolutePath + JABUtil.GetPlatformName() + "/";
         }
 
         /// <summary>
@@ -145,7 +145,7 @@ namespace JAB
             }
             else
             {
-                AssetBundleManager.SetSourceAssetBundleURL(url);
+                JABMgr.SetSourceAssetBundleURL(url);
             }
         }
 
@@ -335,7 +335,7 @@ namespace JAB
         /// <param name="assetName"></param>
         /// <param name="type"></param>
         /// <returns></returns>
-        static public AssetBundleLoadAssetOperation LoadAssetAsync<T>(string assetBundleName, string assetName) where T : UnityEngine.Object
+        static public JABLoadAssetOperation LoadAssetAsync<T>(string assetBundleName, string assetName) where T : UnityEngine.Object
         {
             Log(LogType.Info, "Loading " + assetName + " from " + assetBundleName + " bundle");
 
@@ -343,7 +343,7 @@ namespace JAB
 
             assetBundleName = RemapVariantName(assetBundleName);
             LoadAssetBundle(assetBundleName);
-            AssetBundleLoadAssetOperation operation = new AssetBundleLoadAssetOperation(assetBundleName, assetName, typeof(T));
+            JABLoadAssetOperation operation = new JABLoadAssetOperation(assetBundleName, assetName, typeof(T));
 
             m_InProgressOperations.Add(operation);
 
@@ -368,7 +368,7 @@ namespace JAB
         /// <param name="levelName"></param>
         /// <param name="isAdditive"></param>
         /// <returns></returns>
-        static public AssetBundleLoadOperation LoadLevelAsync(string assetBundleName, string levelName, bool isAdditive)
+        static public JABLoadOperation LoadLevelAsync(string assetBundleName, string levelName, bool isAdditive)
         {
             Log(LogType.Info, "Loading " + levelName + " from " + assetBundleName + " bundle");
 
@@ -376,14 +376,14 @@ namespace JAB
 
             assetBundleName = RemapVariantName(assetBundleName);
             LoadAssetBundle(assetBundleName);
-            AssetBundleLoadOperation operation = new AssetBundleLoadLevelOperation(assetBundleName, levelName, isAdditive);
+            JABLoadOperation operation = new JABLoadLevelOperation(assetBundleName, levelName, isAdditive);
 
             m_InProgressOperations.Add(operation);
 
             return operation;
         }
 
-        static private IEnumerator IE_LoadAssetAsync<T>(AssetBundleLoadOperation request, Action<T> assetCallback = null, Action<bool> levelCallBack = null) where T : UnityEngine.Object
+        static private IEnumerator IE_LoadAssetAsync<T>(JABLoadOperation request, Action<T> assetCallback = null, Action<bool> levelCallBack = null) where T : UnityEngine.Object
         {
             if (request == null)
             {
@@ -400,7 +400,7 @@ namespace JAB
             yield return ABLoaderMgr.StartCoroutine(request);
             if (assetCallback != null)
             {
-                assetCallback((request as AssetBundleLoadAssetOperation).GetAsset<T>());
+                assetCallback((request as JABLoadAssetOperation).GetAsset<T>());
             }
             if (levelCallBack != null)
             {
@@ -408,7 +408,7 @@ namespace JAB
             }
         }
 
-        static public AssetBundleLoadManifestOperation LoadManifest()
+        static public JABLoadManifestOperation LoadManifest()
         {
             if (m_AssetBundleManifest != null)
             {
@@ -420,9 +420,9 @@ namespace JAB
                 m_ABLoaderMgr = ABLoaderMgr;
             }
 
-            string manifestAssetBundleName = Utility.GetPlatformName();
+            string manifestAssetBundleName = JABUtil.GetPlatformName();
             LoadAssetBundle(manifestAssetBundleName, true);
-            AssetBundleLoadManifestOperation operation = new AssetBundleLoadManifestOperation(manifestAssetBundleName, "AssetBundleManifest", typeof(AssetBundleManifest));
+            JABLoadManifestOperation operation = new JABLoadManifestOperation(manifestAssetBundleName, "AssetBundleManifest", typeof(AssetBundleManifest));
             m_InProgressOperations.Add(operation);
             
             return operation;
